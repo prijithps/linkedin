@@ -1,4 +1,3 @@
-Here’s a polished, concise, and LinkedIn-friendly version of your story — with a strong hook and clean formatting:
 
 ---
 
