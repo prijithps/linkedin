@@ -37,3 +37,97 @@ Three key takeaways:
 1. Always check both df and du when troubleshooting disk space
 
 It’s a small detail, but understanding it can save you from confusing production incidents.
+
+
+You can **easily recreate this scenario** on any Linux machine (even a VM or Docker container).
+Here’s a clean, safe demo that shows **how deleting a file doesn’t free space when a process keeps it open**.
+
+---
+
+## ✅ **Step-by-step: Recreate the “deleted file still consuming space” issue**
+
+### **1️⃣ Create a big dummy file**
+
+This simulates a large log file.
+
+```bash
+fallocate -l 1G bigfile.log
+```
+
+### **2️⃣ Open the file with a process that keeps it “in use”**
+
+Use `tail -f`, which keeps a file handle open indefinitely:
+
+```bash
+tail -f bigfile.log &
+```
+
+Keep note of the PID (printed automatically or find it with `ps`).
+
+### **3️⃣ Check initial disk usage**
+
+```bash
+df -h .
+```
+
+### **4️⃣ Delete the file**
+
+```bash
+rm bigfile.log
+```
+
+Now run:
+
+```bash
+ls -lh
+```
+
+→ You won’t see the file anymore.
+
+### **5️⃣ Check disk usage again**
+
+```bash
+df -h .
+```
+
+→ **Disk usage will NOT reduce**, even though the file is gone from the directory.
+
+### **6️⃣ Inspect open deleted files**
+
+```bash
+lsof +L1
+```
+
+You’ll see something like:
+
+```
+tail   1234 user   3r   REG  8,1 1073741824 123456 /path/bigfile.log (deleted)
+```
+
+This means the inode still exists because `tail` is holding it.
+
+### **7️⃣ Kill the process**
+
+```bash
+kill <PID>
+```
+
+### **8️⃣ Check disk usage again**
+
+```bash
+df -h .
+```
+
+→ Disk usage finally drops, because the inode is released.
+
+---
+
+## 🔍 What just happened?
+
+* You deleted the filename.
+* But the **inode remained**, because `tail -f` kept the file handle open.
+* The data stayed on disk until the process exited.
+
+This recreates exactly what happened on your production server.
+
+---
